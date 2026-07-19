@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Warehouse OCR</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f7f7f9;
+      color: #222;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      padding: 1.5rem;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    input[type="file"] {
+      width: 100%;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 1.5rem;
+    }
+    .meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.9rem;
+      color: #475569;
+    }
+    pre {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 0.75rem;
+      overflow: auto;
+      font-size: 0.85rem;
+      max-height: 300px;
+    }
+    .error {
+      color: #b91c1c;
+      background: #fee2e2;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Warehouse Document OCR</h1>
+    <form id="ocrForm">
+      <div class="form-row">
+        <input type="file" id="file" accept="image/*" required />
+        <button type="submit" id="uploadBtn">Upload & OCR</button>
+      </div>
+    </form>
+
+    <div id="error" class="error" style="display:none;"></div>
+
+    <div class="result" id="result" style="display:none;">
+      <div class="meta">
+        <div><strong>Filename:</strong> <span id="filename"></span></div>
+        <div><strong>Avg confidence:</strong> <span id="avgConf"></span></div>
+      </div>
+      <h3>Extracted text</h3>
+      <pre id="fullText"></pre>
+      <h3>Detections</h3>
+      <pre id="detections"></pre>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('ocrForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('file');
+    const errorDiv = document.getElementById('error');
+    const resultDiv = document.getElementById('result');
+    const filenameEl = document.getElementById('filename');
+    const avgConfEl = document.getElementById('avgConf');
+    const fullTextEl = document.getElementById('fullText');
+    const detectionsEl = document.getElementById('detections');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorDiv.style.display = 'none';
+      resultDiv.style.display = 'none';
+      uploadBtn.disabled = true;
+
+      const file = fileInput.files[0];
+      if (!file) {
+        showError('Please select a file.');
+        uploadBtn.disabled = false;
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/ocr', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || 'Upload failed');
+        }
+
+        const data = await res.json();
+        filenameEl.textContent = data.filename || '';
+        avgConfEl.textContent = (data.avg_confidence ?? 0).toFixed(3);
+        fullTextEl.textContent = data.full_text || '';
+        detectionsEl.textContent = JSON.stringify(data.detections, null, 2);
+
+        resultDiv.style.display = 'block';
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+
+    function showError(msg) {
+      errorDiv.textContent = msg;
+      errorDiv.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
